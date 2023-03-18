@@ -2,10 +2,95 @@ import java.util.*;
 import java.util.concurrent.*;
 // make a linked list type structure
 public class birthdayPresents {
-    public static void main(String[] args){
-        
+    final int numGuests = 500000;
+    final int numServants = 4;
+    LinkedList<Integer> presents;
+    ConcurLinkedList list;
+    HashSet<Integer> thankYouCards;
+    Semaphore lock = new Semaphore(1);
+    public birthdayPresents(){
+        presents = randomizePresents(numGuests);
+        list = new ConcurLinkedList();
+        thankYouCards = new HashSet<Integer>();
     }
+    public static void main(String[] args){
+        birthdayPresents bp = new birthdayPresents();
+        Thread[] servants = new Thread[bp.numServants];
+        long startTime = System.currentTimeMillis();
+        for(int i = 0; i < bp.numServants; i++){
+            servants[i] = new Thread(new Servant(bp));
+            servants[i].start();
+        }
 
+        for(int i = 0; i < bp.numServants; i++){
+            try{
+                servants[i].join();
+            } catch (Exception e){
+                e.printStackTrace();
+            }
+        }
+        long endTime = System.currentTimeMillis();
+        System.out.println("Time taken: " + (endTime - startTime) + " ms");
+    }
+    public static LinkedList<Integer> randomizePresents(int numGuests){
+        LinkedList<Integer> presents = new LinkedList<Integer>();
+        for(int i = 0; i < numGuests; i++){
+            presents.add(i);
+        }
+        Collections.shuffle(presents);
+        return presents;
+    }
+}
+
+// this will be used to manage servants
+class Servant implements Runnable{
+    birthdayPresents bp;
+    Random r = new Random();
+    public Servant(birthdayPresents bp){
+        this.bp = bp;
+    }
+    public void run(){
+        while(bp.thankYouCards.size() < bp.numGuests){
+            int job = r.nextInt(3);
+            if(job == 0){
+                // add gift to list in order to process
+                try{
+                    bp.lock.acquire();
+                    if(bp.presents.size() > 0){
+                        int present = bp.presents.pop();
+                        bp.list.add(present);
+                    }
+                    bp.lock.release();
+                } catch (Exception e){
+                    e.printStackTrace();
+                }
+            } else if(job == 1){
+                // search for gift
+                int randGift = r.nextInt(bp.numGuests);
+                boolean found = bp.list.contains(randGift);
+                // prints out when gift is found
+                System.out.println("Gift " + (randGift + 1) + " has been found: " + found);
+            } else if(job == 2){
+                // this task is for writing card
+                if(bp.list.size == 0){
+                    continue;
+                }
+
+                int gift = bp.list.pop();
+                try{   
+                    bp.lock.acquire(); 
+                    if(gift != -1){
+                        bp.thankYouCards.add(gift);
+                        System.out.println("Thank you guest number " + (gift + 1) + " for the present!");
+                    }
+                    bp.lock.release();
+                } catch (Exception e){
+                    e.printStackTrace();
+                }
+
+            }
+        }
+    }
 }
 
 class ConcurrentLLNode {
@@ -22,12 +107,12 @@ class ConcurrentLLNode {
     }
 }
 
-class LinkedList {
+class ConcurLinkedList {
     ConcurrentLLNode head;
     ConcurrentLLNode tail;
     int size;
     Semaphore lock = new Semaphore(1);
-    LinkedList() {
+    ConcurLinkedList() {
         this.head = null;
         this.tail = null;
         this.size = 0;
@@ -92,6 +177,7 @@ class LinkedList {
             ConcurrentLLNode cur = head;
             while(cur != null){
                 if(cur.data == data){
+                    //System.out.println("content found");
                     found = true;
                     break;
                 }
