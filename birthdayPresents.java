@@ -8,13 +8,18 @@ public class birthdayPresents {
     ConcurLinkedList list;
     HashSet<Integer> thankYouCards;
     Semaphore lock = new Semaphore(1);
+    boolean printOutput;
     public birthdayPresents(){
         presents = randomizePresents(numGuests);
         list = new ConcurLinkedList();
         thankYouCards = new HashSet<Integer>();
+        printOutput = false;
     }
     public static void main(String[] args){
         birthdayPresents bp = new birthdayPresents();
+        if(args.length == 1 && args[0].toLowerCase().equals("true")){
+           bp.printOutput = Boolean.parseBoolean(args[0]);
+        }
         Thread[] servants = new Thread[bp.numServants];
         long startTime = System.currentTimeMillis();
         for(int i = 0; i < bp.numServants; i++){
@@ -32,6 +37,7 @@ public class birthdayPresents {
         long endTime = System.currentTimeMillis();
         System.out.println("Time taken: " + (endTime - startTime) + " ms");
     }
+    // simulates a random bag of presents
     public static LinkedList<Integer> randomizePresents(int numGuests){
         LinkedList<Integer> presents = new LinkedList<Integer>();
         for(int i = 0; i < numGuests; i++){
@@ -42,7 +48,8 @@ public class birthdayPresents {
     }
 }
 
-// this will be used to manage servants
+// this will be used to manage servants each servant is a thread and gets assigned a random task on each run. 0 is adding a gift to chain, 
+// 1 is searching for a random gift in chain, and 2 is writing a thank you card
 class Servant implements Runnable{
     birthdayPresents bp;
     Random r = new Random();
@@ -69,7 +76,8 @@ class Servant implements Runnable{
                 int randGift = r.nextInt(bp.numGuests);
                 boolean found = bp.list.contains(randGift);
                 // prints out when gift is found
-                System.out.println("Gift " + (randGift + 1) + " has been found: " + found);
+                if(bp.printOutput)
+                    System.out.println("Gift " + (randGift + 1) + " has been found: " + found);
             } else if(job == 2){
                 // this task is for writing card
                 if(bp.list.size == 0){
@@ -81,7 +89,8 @@ class Servant implements Runnable{
                     bp.lock.acquire(); 
                     if(gift != -1){
                         bp.thankYouCards.add(gift);
-                        System.out.println("Thank you guest number " + (gift + 1) + " for the present!");
+                        if(bp.printOutput)
+                            System.out.println("Thank you guest number " + (gift + 1) + " for the present!");
                     }
                     bp.lock.release();
                 } catch (Exception e){
@@ -93,6 +102,7 @@ class Servant implements Runnable{
     }
 }
 
+// store concurrent LinkedList node
 class ConcurrentLLNode {
     int data;
     ConcurrentLLNode next;
@@ -107,6 +117,7 @@ class ConcurrentLLNode {
     }
 }
 
+// store concurrent LinkedList
 class ConcurLinkedList {
     ConcurrentLLNode head;
     ConcurrentLLNode tail;
