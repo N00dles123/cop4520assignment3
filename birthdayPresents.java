@@ -74,7 +74,7 @@ class Servant implements Runnable{
             } else if(job == 1){
                 // search for gift
                 int randGift = r.nextInt(bp.numGuests);
-                boolean found = bp.list.contains(randGift);
+                boolean found = bp.list.contains(randGift) && bp.thankYouCards.contains(randGift);
                 // prints out when gift is found
                 if(bp.printOutput)
                     System.out.println("Gift " + (randGift + 1) + " has been found: " + found);
@@ -143,36 +143,19 @@ class ConcurLinkedList {
         }
         return str;
     }
-    // add will add to keep list in growing order to make finding stuff easier
+    // add will add to end of linked list
     public void add(int data){
         try{
             lock.acquire();
             ConcurrentLLNode nextNode = new ConcurrentLLNode(data);
-            if (head == null) {
+            // insert between head and its next value
+            if(head != null){
+                tail.next = nextNode;
+                nextNode.prev = tail;
+                tail = nextNode;
+            } else {
                 head = nextNode;
                 tail = nextNode;
-            } else if(head.data >= nextNode.data){
-                nextNode.next = head;
-                nextNode.next.prev = nextNode;
-                head = nextNode;
-            } else {
-                ConcurrentLLNode cur = head;
-                while(cur.next != null && cur.next.data < nextNode.data){
-                    cur = cur.next;
-                }
-
-                nextNode.next = cur.next;
-
-                if(cur.next != null){
-                    nextNode.next.prev = nextNode;
-                }
-
-                cur.next = nextNode;
-                nextNode.prev = cur;
-
-                if(nextNode.next == null){
-                    tail = nextNode;
-                }
             }
             size++;
             lock.release();
