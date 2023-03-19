@@ -15,6 +15,7 @@ public class birthdayPresents {
         thankYouCards = new HashSet<Integer>();
         printOutput = false;
     }
+    
     public static void main(String[] args){
         birthdayPresents bp = new birthdayPresents();
         if(args.length == 1 && args[0].toLowerCase().equals("true")){
@@ -36,6 +37,31 @@ public class birthdayPresents {
         }
         long endTime = System.currentTimeMillis();
         System.out.println("Time taken: " + (endTime - startTime) + " ms");
+    }
+
+    // to use in tester class
+    public long run(boolean printOutput){
+        long startTime = System.currentTimeMillis();
+        birthdayPresents bp = new birthdayPresents();
+        if(printOutput){
+            bp.printOutput = printOutput;
+        }
+        Thread[] servants = new Thread[bp.numServants];
+        for(int i = 0; i < bp.numServants; i++){
+            servants[i] = new Thread(new Servant(bp));
+            servants[i].start();
+        }
+
+        for(int i = 0; i < bp.numServants; i++){
+            try{
+                servants[i].join();
+            } catch (Exception e){
+                e.printStackTrace();
+            }
+        }
+        long endTime = System.currentTimeMillis();
+        System.out.println("Time taken: " + (endTime - startTime) + " ms");
+        return endTime - startTime;
     }
     // simulates a random bag of presents
     public static LinkedList<Integer> randomizePresents(int numGuests){
