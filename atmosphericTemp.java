@@ -9,11 +9,30 @@ public class atmosphericTemp {
     int[] temps = new int[NUM_THREADS * 60]; // each thread records a temperature every minute
     boolean sensorAvailable[] = new boolean[NUM_THREADS];
     Semaphore lock = new Semaphore(1);
+    // you can manually set the num of hours
     int numHours = 24;
     public static void main(String[] args){
         atmosphericTemp at = new atmosphericTemp();
-        for(int i = 0; i < 20; i++)
-            at.run();
+        // all sensors begin as ready
+        for(int i = 0; i < NUM_THREADS; i++){
+            at.sensorAvailable[i] = true;
+        }
+        Thread[] sensors = new Thread[NUM_THREADS];
+        long startTime = System.currentTimeMillis();
+        for(int i = 0; i < NUM_THREADS; i++){
+            sensors[i] = new Thread(new sensorThread(at, i));
+            sensors[i].start();
+        }
+        for(int i = 0; i < NUM_THREADS; i++){
+            try{
+                sensors[i].join();
+            } catch (Exception e){
+                e.printStackTrace();
+            }
+        }
+
+        long endTime = System.currentTimeMillis();
+        System.out.println("Time taken: " + (endTime - startTime) + " ms");
     }
     public void run(){
         atmosphericTemp at = new atmosphericTemp();
