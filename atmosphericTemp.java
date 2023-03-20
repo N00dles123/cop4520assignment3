@@ -1,12 +1,12 @@
 import java.util.*;
 import java.util.concurrent.*;
-// make use of array to store the temperatures at each hour
+// make use of matrix to store the temperatures at each hour
 // use semamphores to lock the arraylist and enforce mutal exclusion on critical section
 // wait for all sensors to finish by using an array of booleans
 // we only need to keep track of temperatures in that one hour so we can override in the next hour
 public class atmosphericTemp {
     final static int NUM_THREADS = 8;
-    int[] temps = new int[NUM_THREADS * 60]; // each thread records a temperature every minute
+    int[][] temps = new int[NUM_THREADS][60]; // each thread records a temperature every minute
     boolean sensorAvailable[] = new boolean[NUM_THREADS];
     Semaphore lock = new Semaphore(1);
     // you can manually set the num of hours
@@ -83,7 +83,7 @@ class sensorThread implements Runnable{
                 // since its recording temp we set it to not ready
                 at.sensorAvailable[id] = false;
                 // record current temp
-                at.temps[j + (id * 60)] = generateRandomTemp();
+                at.temps[id][j] = generateRandomTemp();
                 at.sensorAvailable[id] = true;
 
                 // check to see if all sensors are done for current minute before continuing if not we sleep the thread
@@ -106,7 +106,16 @@ class sensorThread implements Runnable{
                 }
                 System.out.println("Hour " + (i + 1) + " report: ");
                 hourlyReport();
-                
+                //System.out.println();
+                /*
+                for(int k = 0; k < 8; k++){
+                    for(int l = 0; l < 60; l++){
+                        System.out.print(at.temps[k][l] + " ");
+                    }
+                    System.out.println();
+                }
+                System.out.println();
+                */
                 try{
                     at.lock.release();
                 } catch (Exception e){
@@ -135,35 +144,38 @@ class sensorThread implements Runnable{
     public void getLargestDiff(){
         int largestDiff = Integer.MIN_VALUE;
         int interval = 0;
-        // loop through 80 at a time
-        for(int i = 0; i < 80; i++){
-            int max = max(i, i + 10);
-            int min = min(i, i + 10);
-            if(max - min > largestDiff){
-                interval = i;
+        // loop in chunks like a sliding window problem but for each thread each minute
+        for(int sensor = 0; sensor < 8; sensor++){
+            for(int i = 0; i < 49; i++){
+                int max = max(sensor, i, i + 10);
+                int min = min(sensor, i, i + 10);
+                int diff = max - min;
+                if(diff > largestDiff){
+                    largestDiff = diff;
+                    interval = i;
+                }
             }
-            largestDiff = Math.max(largestDiff, max - min);
         }
         
         System.out.println("Largest temperature difference: " + largestDiff + "F " + " from minute " + interval + " to minute " + (interval + 10));
     }
 
     // utility function to get highest value in a range
-    public int max(int start, int end){
+    public int max(int sensor, int start, int end){
         int max = Integer.MIN_VALUE;
         for(int i = start; i < end; i++){
-            if(at.temps[i] > max){
-                max = at.temps[i];
+            if(at.temps[sensor][i] > max){
+                max = at.temps[sensor][i];
             }
         }
         return max;
     }
     // utility function to get lowest value in a range
-    public int min(int start, int end){
+    public int min(int sensor, int start, int end){
         int min = Integer.MAX_VALUE;
         for(int i = start; i < end; i++){
-            if(at.temps[i] < min){
-                min = at.temps[i];
+            if(at.temps[sensor][i] < min){
+                min = at.temps[sensor][i];
             }
         }
         return min;
@@ -174,7 +186,9 @@ class sensorThread implements Runnable{
         // add all array values to a pq
         PriorityQueue<Integer> pq = new PriorityQueue<>(Collections.reverseOrder());
         for(int i = 0; i < at.temps.length; i++){
-            pq.add(at.temps[i]);
+            for(int j = 0; j < at.temps[i].length; j++){
+                pq.add(at.temps[i][j]);
+            }
         }
         System.out.println("Highest temperatures: ");
         for(int i = at.temps.length - 1; i > at.temps.length - 6; i--){
@@ -188,7 +202,9 @@ class sensorThread implements Runnable{
         // add all array values to a pq
         PriorityQueue<Integer> pq = new PriorityQueue<>();
         for(int i = 0; i < at.temps.length; i++){
-            pq.add(at.temps[i]);
+            for(int j = 0; j < at.temps[i].length; j++){
+                pq.add(at.temps[i][j]);
+            }
         }
         System.out.println("Lowest temperatures: ");
         for(int i = 0; i < 5; i++){
