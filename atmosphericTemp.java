@@ -11,12 +11,12 @@ public class atmosphericTemp {
     final Random r = new Random();
     // you can manually set the num of hours
     int numHours = 72;
-    volatile ArrayList<ArrayList<Integer>> temps; // each thread records a temperature every minute
+    volatile int[] temps; // each thread records a temperature every minute
     volatile ArrayList<Boolean> sensorAvailable;
 
     public static void main(String[] args){
         atmosphericTemp at = new atmosphericTemp();
-        at.temps = new ArrayList<ArrayList<Integer>>();
+        at.temps = new int[NUM_THREADS * 60];
         at.sensorAvailable = new ArrayList<>();
         Scanner sc = new Scanner(System.in);
         System.out.println("Enter number of hours: ");
@@ -24,11 +24,7 @@ public class atmosphericTemp {
         sc.close();
         // initialize the arraylist of arraylists
         for(int i = 0; i < NUM_THREADS; i++){
-            at.temps.add(new ArrayList<Integer>());
             at.sensorAvailable.add(false);
-            for(int j = 0; j < 60; j++){
-                at.temps.get(i).add(0);
-            }
         }
 
         
@@ -53,22 +49,20 @@ public class atmosphericTemp {
     }
     
     // checks to see if sensors are ready so we can proceed to "next minute"
-    public boolean sensorsReady(ArrayList<Boolean> sensorAvailable){
+    public boolean sensorsReady(ArrayList<Boolean> sensorAvailable, int id){
         for(int i = 0; i < NUM_THREADS; i++){
-            if(!sensorAvailable.get(i)){
+            if(!sensorAvailable.get(i) && id != i){
                 return false;
             }
         }
         return true;
     }
     // get 5 highest temps
-    public void getHighestTemps(ArrayList<ArrayList<Integer>> temps){
+    public void getHighestTemps(int[] temps){
         // add all array values to a pq
         PriorityQueue<Integer> pq = new PriorityQueue<>(Collections.reverseOrder());
-        for(int i = 0; i < temps.size(); i++){
-            for(int j = 0; j < temps.get(i).size(); j++){
-                pq.add(temps.get(i).get(j));
-            }
+        for(int i = 0; i < temps.length; i++){
+            pq.add(temps[i]);
         }
         System.out.println("Highest temperatures: ");
         for(int i = 0; i < 5; i++){
@@ -78,14 +72,15 @@ public class atmosphericTemp {
     }
 
     // each index represents a minute and thread value so example 0 is thread 0 minute 0 and 59 is thread 0 minute 59
-    public void getLargestDiff(ArrayList<ArrayList<Integer>> temperatures){
+    public void getLargestDiff(int[] temperatures){
         int largestDiff = Integer.MIN_VALUE;
         int interval = 0;
         // loop in chunks like a sliding window problem but for each thread each minute
-        for(int sensor = 0; sensor < 8; sensor++){
-            for(int i = 0; i < 49; i++){
-                int max = max(sensor, i, i + 10, temperatures);
-                int min = min(sensor, i, i + 10, temperatures);
+        for(int threadId = 0; threadId < NUM_THREADS; threadId++){
+            int curMin = threadId * 60;
+            for(int i = curMin; i < MINS_PER_HOUR - 10 + 1; i += 10){
+                int max = max(i, i + 10, temperatures);
+                int min = min(i, i + 10, temperatures);
                 int diff = max - min;
                 if(diff > largestDiff){
                     largestDiff = diff;
@@ -100,39 +95,32 @@ public class atmosphericTemp {
 
 
     // utility function to get highest value in a range
-    public int max(int sensor, int start, int end, ArrayList<ArrayList<Integer>> temperatures){
+    public int max(int start, int end, int[] temperatures){
         int max = Integer.MIN_VALUE;
         for(int i = start; i < end; i++){
-            if(temperatures.get(sensor).get(i) > max){
-                max = temperatures.get(sensor).get(i);
+            if(temperatures[i] > max){
+                max = temperatures[i];
             }
         }
         return max;
     }
     // utility function to get lowest value in a range
-    public int min(int sensor, int start, int end, ArrayList<ArrayList<Integer>> temperatures){
+    public int min(int start, int end, int[] temperatures){
         int min = Integer.MAX_VALUE;
         for(int i = start; i < end; i++){
-            if(temperatures.get(sensor).get(i) < min){
-                min = temperatures.get(sensor).get(i);
+            if(temperatures[i] < min){
+                min = temperatures[i];
             }
         }
         return min;
     }
 
-    
-    public int generateRandomTemp(){
-        int temp = r.nextInt(171) - 100;
-        return temp;
-    }
     // get 5 lowest temps
-    public void getLowestTemps(ArrayList<ArrayList<Integer>> temps){
+    public void getLowestTemps(int[] temps){
         // add all array values to a pq
         PriorityQueue<Integer> pq = new PriorityQueue<>();
-        for(int i = 0; i < temps.size(); i++){
-            for(int j = 0; j < temps.get(i).size(); j++){
-                pq.add(temps.get(i).get(j));
-            }
+        for(int i = 0; i < temps.length; i++){
+            pq.add(temps[i]);
         }
         System.out.println("Lowest temperatures: ");
         for(int i = 0; i < 5; i++){
@@ -141,9 +129,10 @@ public class atmosphericTemp {
         System.out.println();
     }
 
-    public void hourlyReport(int hour, ArrayList<ArrayList<Integer>> temperatures){
+    public void hourlyReport(int hour, int[] temperatures){
         try{
             System.out.println("Hour " + (hour + 1) + " report:");
+            //System.out.println(Arrays.toString(temperatures));
             // get 5 highest temps
             getHighestTemps(temperatures);
             // get 5 lowest temps
@@ -161,6 +150,7 @@ public class atmosphericTemp {
 class sensorThread implements Runnable{
     volatile atmosphericTemp at;
     int id;
+    Random r = new Random();
     public sensorThread(atmosphericTemp at, int id){
         this.at = at;
         this.id = id;
@@ -168,17 +158,20 @@ class sensorThread implements Runnable{
     public void run(){
         recordTemperature(this.id, at.temps, at.sensorAvailable);
     }
-    
-    public void recordTemperature(int id, ArrayList<ArrayList<Integer>> temps, ArrayList<Boolean> sensorAvailable){
+    public int generateRandomTemp(){
+        int temp = r.nextInt(171) - 100;
+        return temp;
+    }
+
+    public void recordTemperature(int id, int[] temps, ArrayList<Boolean> sensorAvailable){
         // to simulate each hour and minute
         for(int i = 0; i < at.numHours; i++){
             for(int j = 0; j < at.MINS_PER_HOUR; j++){
-                // since its recording temp we set it to not ready
                 sensorAvailable.set(this.id, false);
-                temps.get(id).set(j, at.generateRandomTemp());
+                temps[j + (id * 60)] = generateRandomTemp();
                 sensorAvailable.set(this.id, true);
                 // check to see if all sensors are done for current minute before continuing if not we sleep the thread
-                while(!at.sensorsReady(sensorAvailable)){
+                while(!at.sensorsReady(sensorAvailable, id)){
                     //System.out.println("thread " + id + " is sleeping on minute " + j);
                     try{
                         Thread.sleep(10); // put thread to sleep for 10 ms
@@ -196,7 +189,7 @@ class sensorThread implements Runnable{
                     at.hourlyReport(i, at.temps);
                     at.mutex.release();
                 } catch (Exception e){
-
+                    e.printStackTrace();
                 }
             }
             
