@@ -1,12 +1,13 @@
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.locks.ReentrantLock;
 // make use of matrix to store the temperatures at each hour
 // use semamphores to lock the arraylist and enforce mutal exclusion on critical section
 // wait for all sensors to finish by using an array of booleans
 // we only need to keep track of temperatures in that one hour so we can override in the next hour
 public class atmosphericTemp {
+    Semaphore mutex = new Semaphore(1, true);
     final static int NUM_THREADS = 8;
+    int MINS_PER_HOUR = 60;
     final Random r = new Random();
     // you can manually set the num of hours
     int numHours = 72;
@@ -17,7 +18,10 @@ public class atmosphericTemp {
         atmosphericTemp at = new atmosphericTemp();
         at.temps = new ArrayList<ArrayList<Integer>>();
         at.sensorAvailable = new ArrayList<>();
-
+        Scanner sc = new Scanner(System.in);
+        System.out.println("Enter number of hours: ");
+        at.numHours = sc.nextInt();
+        sc.close();
         // initialize the arraylist of arraylists
         for(int i = 0; i < NUM_THREADS; i++){
             at.temps.add(new ArrayList<Integer>());
@@ -49,9 +53,9 @@ public class atmosphericTemp {
     }
     
     // checks to see if sensors are ready so we can proceed to "next minute"
-    public boolean sensorsReady(int index, ArrayList<Boolean> sensorAvailable){
+    public boolean sensorsReady(ArrayList<Boolean> sensorAvailable){
         for(int i = 0; i < NUM_THREADS; i++){
-            if(!sensorAvailable.get(i) && index != i){
+            if(!sensorAvailable.get(i)){
                 return false;
             }
         }
@@ -155,7 +159,6 @@ public class atmosphericTemp {
 }
 
 class sensorThread implements Runnable{
-    Semaphore lock = new Semaphore(1);
     volatile atmosphericTemp at;
     int id;
     public sensorThread(atmosphericTemp at, int id){
@@ -169,29 +172,29 @@ class sensorThread implements Runnable{
     public void recordTemperature(int id, ArrayList<ArrayList<Integer>> temps, ArrayList<Boolean> sensorAvailable){
         // to simulate each hour and minute
         for(int i = 0; i < at.numHours; i++){
-            for(int j = 0; j < 60; j++){
+            for(int j = 0; j < at.MINS_PER_HOUR; j++){
                 // since its recording temp we set it to not ready
-                at.sensorAvailable.set(this.id, false);
-                at.temps.get(id).set(j, at.generateRandomTemp());
-                at.sensorAvailable.set(this.id, true);
+                sensorAvailable.set(this.id, false);
+                temps.get(id).set(j, at.generateRandomTemp());
+                sensorAvailable.set(this.id, true);
                 // check to see if all sensors are done for current minute before continuing if not we sleep the thread
-                while(!at.sensorsReady(id, at.sensorAvailable)){
-                    //System.out.println("thread " + id + " is sleeping");
+                while(!at.sensorsReady(sensorAvailable)){
+                    //System.out.println("thread " + id + " is sleeping on minute " + j);
                     try{
-                        Thread.sleep(10); // put thread to sleep for 15 ms
+                        Thread.sleep(10); // put thread to sleep for 10 ms
                     } catch (Exception e){
+                        e.printStackTrace();
                     }
                 }
                 
             }
-            
             // once we are done with the hour we print the report
             // we only dedicate one thread to print the report
-            if(this.id == 7){
+            if(this.id == 0){
                 try{
-                    lock.acquire();
+                    at.mutex.acquire();
                     at.hourlyReport(i, at.temps);
-                    lock.release();
+                    at.mutex.release();
                 } catch (Exception e){
 
                 }
