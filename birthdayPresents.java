@@ -169,19 +169,38 @@ class ConcurLinkedList {
         }
         return str;
     }
-    // add will add to end of linked list
+    // add will add to a part of the linked list
     public void add(int data){
         try{
             lock.acquire();
             ConcurrentLLNode nextNode = new ConcurrentLLNode(data);
             // insert between head and its next value
-            if(head != null){
-                tail.next = nextNode;
-                nextNode.prev = tail;
-                tail = nextNode;
-            } else {
+            if(head == null){
                 head = nextNode;
                 tail = nextNode;
+            } else if(head.data >= data){
+                nextNode.next = head;
+                nextNode.next.prev = nextNode;
+                head = nextNode;
+            } else {
+                ConcurrentLLNode cur = head;
+
+                while(cur.next != null && cur.next.data < data){
+                    cur = cur.next;
+                }
+
+                nextNode.next = cur.next;
+
+                if(cur.next != null){
+                    nextNode.next.prev = nextNode;
+                }
+
+                cur.next = nextNode;
+                nextNode.prev = cur;
+
+                if(nextNode.next == null){
+                    tail = nextNode;
+                }
             }
             size++;
             lock.release();
@@ -191,15 +210,17 @@ class ConcurLinkedList {
     }
     // checks if list has certain value
     public boolean contains(int data){
-        boolean found = false;
         try{
             lock.acquire();
+            if(head == null){
+                lock.release();
+                return false;
+            }
             ConcurrentLLNode cur = head;
             while(cur != null){
                 if(cur.data == data){
-                    //System.out.println("content found");
-                    found = true;
-                    break;
+                    lock.release();
+                    return true;
                 }
                 cur = cur.next;
             }
@@ -207,7 +228,7 @@ class ConcurLinkedList {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        return found;
+        return false;
     }
     // pop operation will remove head and give integer value
     public int pop(){
